@@ -17,6 +17,9 @@ public class Main {
         System.out.println(" --logging=off        --- turn off logging to console");
         System.out.println(" --hosts=URL         ---- URL to hosts(comma separated). Defaults to " + DEFAULT_HOSTS);
         System.out.println(" --clustername=name         --- Name of elasticsearch cluster. Defaults to " + DEFAULT_CLUSTER);
+        System.out.println(" --size=int         --- Number of requested hits. Defaults to " + DEFAULT_SIZE );
+        System.out.println(" --fields=fields         --- Comma separated field names to request. Defaults to " + DEFAULT_FIELDS );
+        System.out.println(" --repeatcount=int         --- Number of sources per CSV line. Defaults to " + DEFAULT_REPEAT_COUNT );
     }
 
     public static void main(String args[]) throws IOException, IllegalAccessException, InstantiationException {
@@ -50,6 +53,10 @@ public class Main {
 
             if (param.startsWith("--repeatCount")) {
                 parameters.repeatCount = Integer.parseInt(value.trim());
+            }
+
+            if (param.startsWith("--fields")) {
+                parameters.fields = value.trim();
             }
 
         }

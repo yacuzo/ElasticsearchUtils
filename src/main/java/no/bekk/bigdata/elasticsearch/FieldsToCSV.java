@@ -60,7 +60,7 @@ public class FieldsToCSV implements Util {
         }
         SearchResponse response = client.prepareSearch()
                                         .setQuery(QueryBuilders.matchAllQuery())
-                                        .addFields(parameters.fields)
+                                        .addFields(parameters.fields.split(","))
                                         .setSize(parameters.size)
                                         .execute()
                                         .actionGet();
