@@ -44,6 +44,14 @@ public class Main {
                 parameters.clusterName = value.trim();
             }
 
+            if (param.startsWith("--size")) {
+                parameters.size = Integer.parseInt(value.trim());
+            }
+
+            if (param.startsWith("--repeatCount")) {
+                parameters.repeatCount = Integer.parseInt(value.trim());
+            }
+
         }
 
         Util util = new FieldsToCSV();

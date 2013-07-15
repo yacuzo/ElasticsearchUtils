@@ -15,12 +15,14 @@ public class Parameters {
     public static final int DEFAULT_SIZE = 50;
     public static final String DEFAULT_FIELDS = "accountNumber";
     public static final String DEFAULT_FILE_NAME = "response.txt";
+    public static final int DEFAULT_REPEAT_COUNT = 1;
 
-    public static String hosts = DEFAULT_HOSTS;
-    public static int port = DEFAULT_PORT;
-    public static boolean logging = DEFAULT_LOGGING;
-    public static String clusterName = DEFAULT_CLUSTER;
-    public static int size = DEFAULT_SIZE;
-    public static String fields = DEFAULT_FIELDS;
-    public static String fileName = DEFAULT_FILE_NAME;
+    public String hosts = DEFAULT_HOSTS;
+    public int port = DEFAULT_PORT;
+    public boolean logging = DEFAULT_LOGGING;
+    public String clusterName = DEFAULT_CLUSTER;
+    public int size = DEFAULT_SIZE;
+    public String fields = DEFAULT_FIELDS;
+    public String fileName = DEFAULT_FILE_NAME;
+    public int repeatCount = DEFAULT_REPEAT_COUNT;
 }
