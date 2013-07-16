@@ -1,6 +1,7 @@
 package no.bekk.bigdata.elasticsearch;
 
 import org.elasticsearch.action.search.SearchResponse;
+import org.elasticsearch.action.search.SearchType;
 import org.elasticsearch.client.transport.TransportClient;
 import org.elasticsearch.common.settings.ImmutableSettings;
 import org.elasticsearch.common.settings.Settings;
@@ -59,9 +60,10 @@ public class FieldsToCSV implements Util {
             );
         }
         SearchResponse response = client.prepareSearch()
+                                        .setSearchType(SearchType.QUERY_AND_FETCH)
                                         .setQuery(QueryBuilders.matchAllQuery())
                                         .addFields(parameters.fields.split(","))
-                                        .setSize(parameters.size)
+                                        .setSize(parameters.size / 3)
                                         .execute()
                                         .actionGet();
 

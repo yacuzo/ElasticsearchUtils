@@ -14,7 +14,7 @@ public class Parameters {
     public static final String DEFAULT_CLUSTER = "TransactionCluster";
     public static final int DEFAULT_SIZE = 50;
     public static final String DEFAULT_FIELDS = "accountNumber";
-    public static final String DEFAULT_FILE_NAME = "response.txt";
+    public static final String DEFAULT_FILE_NAME = "response.csv";
     public static final int DEFAULT_REPEAT_COUNT = 1;
 
     public String hosts = DEFAULT_HOSTS;
