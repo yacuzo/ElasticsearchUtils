@@ -14,6 +14,9 @@ public class Main {
 
     private static void printHelp() {
         System.out.println("Possible parameters:");
+        System.out.println(" --util             --- Which util to run. values: csv, ubq. Defaults to " + DEFAULT_UTIL);
+        System.out.println(" --filter           --- String to filter on for UpdateByQuery. No default!");
+        System.out.println(" --bulksize         --- Set the size of bulk requests. Defaults to " + DEFAULT_BULK_SIZE);
         System.out.println(" --logging=off        --- turn off logging to console");
         System.out.println(" --hosts=URL         ---- URL to hosts(comma separated). Defaults to " + DEFAULT_HOSTS);
         System.out.println(" --clustername=name         --- Name of elasticsearch cluster. Defaults to " + DEFAULT_CLUSTER);
@@ -27,6 +30,18 @@ public class Main {
         Parameters parameters = new Parameters();
         for (String param : args) {
             String value = param.contains("=") ? param.split("=")[1] : "";
+
+
+            if(param.startsWith("--util")) {
+                switch(value.trim()) {
+                    case "csv":
+                        parameters.util = FieldsToCSV.class;
+                        break;
+                    case "ubq":
+                        parameters.util = UpdateByQuery.class;
+                        break;
+                }
+            }
 
             if (param.startsWith("--help")) {
                 printHelp();
@@ -59,9 +74,21 @@ public class Main {
                 parameters.fields = value.trim();
             }
 
+            if (param.startsWith("--bulksize")) {
+                parameters.bulkSize = Integer.parseInt(value.trim());
+            }
+
+            if (param.startsWith("--filter")) {
+                parameters.filter = value.trim();
+            }
+
+            if (param.startsWith("--value")) {
+                parameters.setTo = Short.parseShort(value.trim());
+            }
+
         }
 
-        Util util = new FieldsToCSV();
+        Util util = parameters.util.newInstance();
         util.initialize(parameters);
         util.run();
     }
