@@ -17,7 +17,7 @@ public class Parameters {
     public static final String DEFAULT_FILE_NAME = "response.csv";
     public static final int DEFAULT_REPEAT_COUNT = 1;
     public static final int DEFAULT_BULK_SIZE = 1000;
-    public static final Class<? extends Util> DEFAULT_UTIL = Util.class;
+    public static final Class<? extends Util> DEFAULT_UTIL = FieldsToCSV.class;
 
     public String hosts = DEFAULT_HOSTS;
     public int port = DEFAULT_PORT;
