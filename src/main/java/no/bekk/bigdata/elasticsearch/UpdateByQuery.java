@@ -20,6 +20,7 @@ import org.elasticsearch.search.SearchHit;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 
@@ -35,6 +36,7 @@ public class UpdateByQuery implements Util{
     TransportClient client;
     AtomicLong totalUpdated = new AtomicLong(0);
     AtomicLong totalHits = new AtomicLong();
+    AtomicInteger runningThreads = new AtomicInteger(0);
     BulkProcessor bulkProcessor;
 
     @Override
@@ -69,7 +71,7 @@ public class UpdateByQuery implements Util{
 
             @Override
             public void beforeBulk(long l, BulkRequest bulkRequest) {
-                //To change body of implemented methods use File | Settings | File Templates.
+                runningThreads.incrementAndGet();
             }
 
             @Override
@@ -80,19 +82,19 @@ public class UpdateByQuery implements Util{
                     System.out.println("" + response.getItems().length + " updates in " +
                             response.getTook() + ". " + (totalHits.get() - totalUpdated.get()) + " doc remaining");
                 }
+                runningThreads.decrementAndGet();
             }
 
             @Override
             public void afterBulk(long l, BulkRequest bulkRequest, Throwable throwable) {
                 throw new RuntimeException(throwable.getMessage());
             }
-        }).setBulkActions(param.bulkSize).setConcurrentRequests(10).build();
+        }).setBulkActions(param.bulkSize).setConcurrentRequests(2).build();
         return bulkProcessor;
     }
 
     @Override
     public void run() {
-        SimpleTrans[] transactions;
         long startTime = System.currentTimeMillis();
 
         if (param.logging) {
@@ -100,26 +102,20 @@ public class UpdateByQuery implements Util{
                     "\nfilter: " + param.filter);
         }
 
-        SearchResponse response = startScan();
+        SearchResponse response = startScroll();
         String scrollId = response.getScrollId();
         totalHits.set(response.getHits().totalHits());
-        do {
-            SearchResponse scrollResponse = client.prepareSearchScroll(scrollId).setScroll("5m").execute().actionGet();
 
-            if (param.logging) {
-                System.out.print("" + scrollResponse.getHits().hits().length + " hits in " + scrollResponse.getTook() + ". ");
-            }
+        if(param.logging) {
+            System.out.println("Total hits found: " + response.getHits().totalHits() + ".");
+        }
 
+        searchAndUpdate(scrollId, response);
 
-            transactions = extractTransFromResponse(scrollResponse);
+        bulkProcessor.close();
 
-            if (transactions == null) {
-
-                break;
-            }
-
-            addToBulk(transactions);
-        } while (totalUpdated.get() < totalHits.get());
+        waitForBulks();
+        client.admin().indices().prepareFlush().setRefresh(true).execute();
 
         if (param.logging) {
             TimeValue timeTaken = new TimeValue(System.currentTimeMillis() - startTime);
@@ -129,27 +125,71 @@ public class UpdateByQuery implements Util{
         }
     }
 
+    private void waitForBulks() {
+        boolean waitForBulks = true;
+        while (waitForBulks) {
+            if (runningThreads.get() == 0) {
+                waitForBulks = false;
+            } else {
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException IEx) {
+                    System.out.print("Too much coffee. Can't sleep! Spinning...");
+                }
+            }
+        }
+    }
+
+    private void searchAndUpdate(String scrollId, SearchResponse response) {
+        SimpleTrans[] transactions = extractTransFromResponse(response);
+
+        if (transactions == null)
+            return;
+
+        addToBulk(transactions);
+
+        do {
+
+            SearchResponse scrollResponse = client.prepareSearchScroll(scrollId).setScroll("5m").execute().actionGet();
+            int hitsThisResponse = scrollResponse.getHits().hits().length;
+
+            if (param.logging) {
+                System.out.println("" + hitsThisResponse + " hits in " + scrollResponse.getTook() + ".");
+            }
+
+            if (hitsThisResponse == 0) //aka there is no more to update
+                break;
+
+            transactions = extractTransFromResponse(response);
+            addToBulk(transactions);
+        } while (totalUpdated.get() < totalHits.get());
+    }
+
     private void addToBulk(SimpleTrans[] transactions) {
         Map<String, Object> scriptParams = new HashMap<>();
         scriptParams.put("val", param.setTo);
 
         for (SimpleTrans trans : transactions) {
-            bulkProcessor.add(client.prepareUpdate(trans.index, "trans", trans.id)
-                    .setScript("ctx._source.category = val;")
-                    .setScriptParams(scriptParams)
-                    .setRouting(trans.accNo)
-                    .request()
-            );
+            boolean valid = trans.checkValidity();
+            if (valid)
+                bulkProcessor.add(client.prepareUpdate(trans.index, "trans", trans.id)
+                        .setScript("ctx._source.category = val;")
+                        .setScriptParams(scriptParams)
+                        .setRouting(trans.accNo)
+                        .request()
+                );
+            else
+                System.out.print("Invalid trans!!!!");
         }
     }
 
     private void handleBulkResponseError(BulkResponse bulkResponse) {
         if (bulkResponse.hasFailures()) {
-            System.out.println(bulkResponse.buildFailureMessage());
+            System.out.println(bulkResponse.getItems()[0].getFailureMessage());
         }
     }
 
-    private SearchResponse startScan() {
+    private SearchResponse startScroll() {
         FilterBuilder filter = FilterBuilders.notFilter(FilterBuilders.termFilter("category",param.setTo));
         SearchResponse response = client.prepareSearch()
                 .setQuery(QueryBuilders.filteredQuery(
@@ -157,14 +197,14 @@ public class UpdateByQuery implements Util{
                         filter
                 ))
                 .setScroll("5m")
-                .addFields(new String[]{"accountNumber"})
+                .addFields("accountNumber")
                 .setSize(param.bulkSize)
                 .execute()
                 .actionGet();
         return response;
     }
 
-    //For testing or something. May be useful again.
+    //May be useful as a separate plugin?
     private void sendMultiGet(SimpleTrans[] transactions) {
         MultiGetRequestBuilder mgrb = client.prepareMultiGet();
         for (SimpleTrans trans : transactions) {
@@ -194,14 +234,27 @@ public class UpdateByQuery implements Util{
     }
 
     private class SimpleTrans {
-        String id;
-        String index;
-        String accNo;
+        String id = "";
+        String index = "";
+        String accNo = "";
 
         SimpleTrans(String id, String index, long accNo) {
             this.id = id.trim();
             this.index = index.trim();
             this.accNo = ""+accNo;
+        }
+
+        public boolean checkValidity() {
+            if (id.isEmpty())
+                return false;
+
+            if (index.isEmpty())
+                return false;
+
+            if (accNo.isEmpty())
+                return false;
+
+            return true;
         }
     }
 }
